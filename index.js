@@ -162,6 +162,7 @@ app.post("/register", upload.single("profileImage"), async (req, res) => {
       isVerified: false,
     });
 
+    
     console.log("🔑 Generating verification token...");
     jwt.sign(
       { userId: createdUser._id, username, email },
