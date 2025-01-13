@@ -30,7 +30,6 @@ const bcryptSalt = bcrypt.genSaltSync(10);
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
-// const allowedOrigins = ["https://chatapp-rosy-eta.vercel.app/"];
 
 const corsOptions = {
   origin: 'http://localhost:5173',
@@ -62,6 +61,7 @@ const storage = new CloudinaryStorage({
     allowed_formats: ["jpg", "jpeg", "png"],
   },
 });
+
 const upload = multer({ storage: storage });
 
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
@@ -72,7 +72,6 @@ async function uploadToS3(fileName, filePath) {
     Bucket: bucketName,
     Key: fileName,
     Body: fileContent,
-    ACL: "public-read",
   });
 
   await s3Client.send(command);
@@ -223,6 +222,7 @@ app.get("/verify-email", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
+  console.log("Login  🙌🙌🙌", username, password);
 
   try {
     const foundUser = await User.findOne({ username });
@@ -266,10 +266,10 @@ app.post("/login", async (req, res) => {
 app.post("/logout", (req, res) => {
   res.cookie("token", "", { sameSite: "none", secure: true }).json("ok");
 });
+
 app.post("/register", upload.single("profileImage"), async (req, res) => {
   const { username, password } = req.body;
   console.log("register:", username, password);
-
   try {
     // Check if the username already exists
     const existingUser = await User.findOne({ username });
@@ -308,6 +308,49 @@ app.post("/register", upload.single("profileImage"), async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 
+});
+
+app.get("/profile", async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  // Log incoming request
+  console.log("📩 Received request to /profile endpoint");
+
+  // Check if Authorization header is present
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("⚠️ Unauthorized: No token provided");
+    return res.status(401).json({ error: "Unauthorized: No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    console.log("🔑 Verifying token...");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("✅ Token verified successfully");
+
+    console.log("🔍 Fetching user data...");
+    const user = await User.findById(decoded.userId).select("-password");
+
+    if (!user) {
+      console.log("❌ User not found");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log("📤 Sending user data:", {
+      userId: user._id,
+      username: user.username,
+      profileImage: user.profileImage,
+    });
+    res.status(200).json({
+      userId: user._id,
+      username: user.username,
+      profileImage: user.profileImage,
+    });
+  } catch (error) {
+    console.error("🚨 Error verifying token or fetching user data:", error);
+    res.status(401).json({ error: "Invalid or expired token" });
+  }
 });
 
 
@@ -358,11 +401,11 @@ wss.on("connection", (connection, req) => {
       const token = tokenCookieString.split("=")[1];
       if (token) {
         jwt.verify(token, jwtSecret, {}, (err, userData) => {
-          if (err) return connection.close(); // Close connection if token verification fails
+          if (err) return connection.close(); 
           const { userId, username } = userData;
           connection.userId = userId;
           connection.username = username;
-          notifyAboutOnlinePeople(); // Notify about online people once authenticated
+          notifyAboutOnlinePeople(); 
         });
       }
     }
