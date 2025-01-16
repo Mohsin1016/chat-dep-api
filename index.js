@@ -16,7 +16,7 @@ const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 
 dotenv.config();
-mongoose.connect(process.env.MONGO_URL,)
+mongoose.connect(process.env.MONGO_URL)
   .then(() => {
     console.log("Successfully connected to MongoDB");
   })
@@ -32,7 +32,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 const corsOptions = {
-  origin: process.env.CLIENT_URL,
+  origin: "https://chat-dep-front.vercel.app/",
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
