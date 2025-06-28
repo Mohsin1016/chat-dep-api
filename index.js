@@ -358,7 +358,7 @@ app.post("/login", async (req, res) => {
         res.cookie("token", token, { 
           sameSite: "none", 
           secure: true,
-          httpOnly: true,
+          httpOnly: false,
           maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         }).status(200).json({
           id: foundUser._id,
