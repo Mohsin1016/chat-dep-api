@@ -18,7 +18,8 @@ const path = require("path");
 const nodemailer = require("nodemailer");
 
 dotenv.config();
-mongoose.connect(process.env.MONGO_URL)
+mongoose
+  .connect(process.env.MONGO_URL)
   .then(() => {
     console.log("Successfully connected to MongoDB");
   })
@@ -35,9 +36,12 @@ app.use(express.json());
 app.use(cookieParser());
 
 const corsOptions = {
-  origin: [process.env.FRONTEND_URL || "https://chat-dep-front.vercel.app", "http://localhost:5173"],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],  
+  origin: [
+    process.env.FRONTEND_URL || "https://chat-dep-front.vercel.app",
+    "http://localhost:5173",
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 };
 
@@ -80,7 +84,7 @@ try {
 } catch (error) {
   console.error("Error creating CloudinaryStorage:", error.message);
   // Fallback to local storage
-  const uploadsDir = path.join(__dirname, 'uploads');
+  const uploadsDir = path.join(__dirname, "uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
@@ -88,13 +92,13 @@ try {
     destination: uploadsDir,
     filename: (req, file, cb) => {
       cb(null, Date.now() + path.extname(file.originalname));
-    }
+    },
   });
 }
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
 const bucketName = process.env.AWS_S3_BUCKET_NAME;
@@ -129,13 +133,14 @@ async function uploadToS3(fileName, filePath) {
 
 async function getUserDataFromRequest(req) {
   return new Promise((resolve, reject) => {
-    const token = req.cookies?.token || 
-                 (req.headers.authorization && req.headers.authorization.split(' ')[1]);
-                 
+    const token =
+      req.cookies?.token ||
+      (req.headers.authorization && req.headers.authorization.split(" ")[1]);
+
     if (!token) {
       return reject(new Error("Authentication token not found"));
     }
-    
+
     jwt.verify(token, jwtSecret, {}, (err, userData) => {
       if (err) {
         return reject(new Error("Invalid or expired token"));
@@ -154,17 +159,18 @@ app.get("/messages/:userId", async (req, res) => {
     const { userId } = req.params;
     const userData = await getUserDataFromRequest(req);
     const ourUserId = userData.userId;
-    
+
     const messages = await Message.find({
       sender: { $in: [userId, ourUserId] },
       recipient: { $in: [userId, ourUserId] },
     }).sort({ createdAt: 1 });
-    
+
     res.status(200).json(messages);
   } catch (error) {
     console.error("Error fetching messages:", error.message);
-    res.status(error.message.includes("token") ? 401 : 500)
-       .json({ error: error.message || "Error fetching messages" });
+    res
+      .status(error.message.includes("token") ? 401 : 500)
+      .json({ error: error.message || "Error fetching messages" });
   }
 });
 
@@ -197,17 +203,17 @@ app.post("/register", upload.single("profileImage"), async (req, res) => {
   console.log("🟢 Incoming registration request");
 
   const { username, password, email } = req.body;
-  
+
   if (!username || !password || !email) {
     return res.status(400).json({ error: "Missing required fields" });
   }
-  
+
   console.log("📝 Data received:", username, password, email);
 
   try {
     console.log("🔍 Checking if username exists...");
-    const existingUser = await User.findOne({ 
-      $or: [{ username }, { email }]
+    const existingUser = await User.findOne({
+      $or: [{ username }, { email }],
     });
 
     if (existingUser) {
@@ -230,27 +236,34 @@ app.post("/register", upload.single("profileImage"), async (req, res) => {
       profileImage: profileImageUrl,
       isVerified: false,
     });
-    
+
     console.log("🔑 Generating verification token...");
     jwt.sign(
       { userId: createdUser._id, username, email },
       jwtSecret,
-      { expiresIn: '1d' },
+      { expiresIn: "1d" },
       async (err, token) => {
         if (err) {
           console.log("❌ Error generating token:", err.message);
-          return res.status(500).json({ error: "Error generating verification token" });
+          return res
+            .status(500)
+            .json({ error: "Error generating verification token" });
         }
 
-        const verificationLink = `${process.env.FRONTEND_URL || "http://localhost:5173"}/verify-email?token=${token}`;
+        const verificationLink = `${
+          process.env.FRONTEND_URL || "http://localhost:5173"
+        }/verify-email?token=${token}`;
         console.log("📧 Sending verification email to:", email);
-        
+
         // Skip email sending if transporter not configured
         if (!transporter) {
-          console.warn("Email transporter not configured, skipping verification email");
-          return res.status(201).json({ 
-            message: "Registration successful. Email verification skipped (email service not configured).",
-            userId: createdUser._id 
+          console.warn(
+            "Email transporter not configured, skipping verification email"
+          );
+          return res.status(201).json({
+            message:
+              "Registration successful. Email verification skipped (email service not configured).",
+            userId: createdUser._id,
           });
         }
 
@@ -259,24 +272,103 @@ app.post("/register", upload.single("profileImage"), async (req, res) => {
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Verify your email address",
-            html: `<p>Hi ${username},</p>
-                   <p>Please click on the link below to verify your email address:</p>
-                   <a href="${verificationLink}">Verify Email</a>`,
+            html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4f46e5;
+      text-decoration: none;
+    }
+    .content {
+      padding: 30px 20px;
+    }
+    .button {
+      display: inline-block;
+      background-color: #4f46e5;
+      color: #ffffff !important;
+      font-weight: bold;
+      text-decoration: none;
+      padding: 12px 30px;
+      margin: 20px 0;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .footer {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 14px;
+      color: #666;
+      border-top: 1px solid #eee;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">📱 Chat App</div>
+    </div>
+    <div class="content">
+      <h2>Hello, ${username}!</h2>
+      <p>Thank you for signing up with our chat application. We're excited to have you on board!</p>
+      <p>Please verify your email address to complete your registration and get started with our services.</p>
+      <div style="text-align: center;">
+        <a href="${verificationLink}" class="button">Verify My Email</a>
+      </div>
+      <p>If you didn't create an account, you can safely ignore this email.</p>
+      <p>The verification link will expire in 24 hours.</p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Chat App. All rights reserved.</p>
+      <p>If you have any questions, please contact our support team.</p>
+    </div>
+  </div>
+</body>
+</html>
+`,
           });
-          
+
           console.log("✅ Registration successful. Verification email sent.");
-          res.status(201).json({ 
+          res.status(201).json({
             message: "Registration successful. Please verify your email.",
-            userId: createdUser._id 
+            userId: createdUser._id,
           });
         } catch (emailErr) {
           console.error("Error sending verification email:", emailErr.message);
           // Mark user as verified if email sending fails
           createdUser.isVerified = true;
           await createdUser.save();
-          res.status(201).json({ 
-            message: "Registration successful, but verification email could not be sent. You can log in.",
-            userId: createdUser._id 
+          res.status(201).json({
+            message:
+              "Registration successful, but verification email could not be sent. You can log in.",
+            userId: createdUser._id,
           });
         }
       }
@@ -304,7 +396,7 @@ app.get("/verify-email", async (req, res) => {
 
     const { userId } = decoded;
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -312,7 +404,9 @@ app.get("/verify-email", async (req, res) => {
     user.isVerified = true;
     await user.save();
 
-    res.status(200).json({ message: "Email successfully verified. You can now log in." });
+    res
+      .status(200)
+      .json({ message: "Email successfully verified. You can now log in." });
   } catch (error) {
     console.error("Email verification error:", error.message);
     res.status(400).json({ error: "Invalid or expired token" });
@@ -321,11 +415,13 @@ app.get("/verify-email", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  
+
   if (!username || !password) {
-    return res.status(400).json({ error: "Username and password are required" });
+    return res
+      .status(400)
+      .json({ error: "Username and password are required" });
   }
-  
+
   console.log("Login request received for user:", username);
 
   try {
@@ -336,7 +432,9 @@ app.post("/login", async (req, res) => {
     }
 
     if (!foundUser.isVerified) {
-      return res.status(401).json({ error: "Please verify your email before logging in" });
+      return res
+        .status(401)
+        .json({ error: "Please verify your email before logging in" });
     }
 
     const passOk = bcrypt.compareSync(password, foundUser.password);
@@ -348,24 +446,27 @@ app.post("/login", async (req, res) => {
     jwt.sign(
       { userId: foundUser._id, username },
       jwtSecret,
-      { expiresIn: '30d' },
+      { expiresIn: "30d" },
       (err, token) => {
         if (err) {
           console.error("Error generating JWT:", err.message);
           return res.status(500).json({ error: "Server error" });
         }
 
-        res.cookie("token", token, { 
-          sameSite: "none", 
-          secure: true,
-          httpOnly: true,
-          maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        }).status(200).json({
-          id: foundUser._id,
-          username: foundUser.username,
-          token,
-          userProfile: foundUser.profileImage,
-        });
+        res
+          .cookie("token", token, {
+            sameSite: "none",
+            secure: true,
+            httpOnly: true,
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+          })
+          .status(200)
+          .json({
+            id: foundUser._id,
+            username: foundUser.username,
+            token,
+            userProfile: foundUser.profileImage,
+          });
       }
     );
   } catch (error) {
@@ -375,17 +476,20 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/logout", (req, res) => {
-  res.cookie("token", "", { 
-    sameSite: "none", 
-    secure: true, 
-    httpOnly: true,
-    expires: new Date(0) 
-  }).status(200).json({ message: "Logged out successfully" });
+  res
+    .cookie("token", "", {
+      sameSite: "none",
+      secure: true,
+      httpOnly: true,
+      expires: new Date(0),
+    })
+    .status(200)
+    .json({ message: "Logged out successfully" });
 });
 
 app.get("/profile", async (req, res) => {
   console.log("📩 Received request to /profile endpoint");
-  
+
   try {
     console.log("🔑 Verifying token...");
     const userData = await getUserDataFromRequest(req);
@@ -421,31 +525,31 @@ const server = app.listen(port, () => {
 });
 
 // Handle server errors
-server.on('error', (error) => {
-  console.error('Server error:', error.message);
-  if (error.code === 'EADDRINUSE') {
+server.on("error", (error) => {
+  console.error("Server error:", error.message);
+  if (error.code === "EADDRINUSE") {
     console.error(`Port ${port} is already in use`);
     process.exit(1);
   }
 });
 
 // Handle process termination
-process.on('SIGTERM', shutDown);
-process.on('SIGINT', shutDown);
+process.on("SIGTERM", shutDown);
+process.on("SIGINT", shutDown);
 
 function shutDown() {
-  console.log('Received kill signal, shutting down gracefully');
+  console.log("Received kill signal, shutting down gracefully");
   server.close(() => {
-    console.log('Server closed');
+    console.log("Server closed");
     mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed');
+      console.log("MongoDB connection closed");
       process.exit(0);
     });
   });
-  
+
   // Force close if graceful shutdown fails
   setTimeout(() => {
-    console.error('Forcing shutdown after timeout');
+    console.error("Forcing shutdown after timeout");
     process.exit(1);
   }, 10000);
 }
@@ -481,7 +585,7 @@ wss.on("connection", (connection, req) => {
       clearInterval(connection.timer);
       return;
     }
-    
+
     connection.ping();
     connection.deathTimer = setTimeout(() => {
       connection.isAlive = false;
@@ -529,32 +633,32 @@ wss.on("connection", (connection, req) => {
     try {
       const messageData = JSON.parse(message.toString());
       const { recipient, text, file } = messageData;
-      
+
       if (!recipient) {
         console.warn("Message without recipient:", messageData);
         return;
       }
-      
+
       let fileUrl = null;
-      
+
       if (file) {
         try {
           const parts = file.name.split(".");
           const ext = parts[parts.length - 1];
           const fileName = `${Date.now()}.${ext}`;
-          const filePath = path.join(__dirname, 'uploads', fileName);
-          
+          const filePath = path.join(__dirname, "uploads", fileName);
+
           // Ensure uploads directory exists
-          if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
-            fs.mkdirSync(path.join(__dirname, 'uploads'), { recursive: true });
+          if (!fs.existsSync(path.join(__dirname, "uploads"))) {
+            fs.mkdirSync(path.join(__dirname, "uploads"), { recursive: true });
           }
-          
+
           const bufferData = Buffer.from(file.data.split(",")[1], "base64");
           fs.writeFileSync(filePath, bufferData);
 
           // Upload to AWS S3
           fileUrl = await uploadToS3(fileName, filePath);
-          
+
           // Clean up local file if S3 upload was successful
           if (fileUrl && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
@@ -563,7 +667,7 @@ wss.on("connection", (connection, req) => {
           console.error("File processing error:", fileError.message);
         }
       }
-      
+
       if (recipient && (text || fileUrl)) {
         const messageDoc = await Message.create({
           sender: connection.userId,
@@ -571,7 +675,7 @@ wss.on("connection", (connection, req) => {
           text,
           file: fileUrl || null,
         });
-        
+
         // Send message to recipient if online
         [...wss.clients]
           .filter((c) => c.userId === recipient && c.readyState === ws.OPEN)
