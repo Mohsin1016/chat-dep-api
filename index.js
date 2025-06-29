@@ -384,26 +384,15 @@ app.post("/logout", (req, res) => {
 });
 
 app.get("/profile", async (req, res) => {
-  const authHeader = req.headers.authorization;
-
-  // Log incoming request
   console.log("📩 Received request to /profile endpoint");
-
-  // Check if Authorization header is present
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("⚠️ Unauthorized: No token provided");
-    return res.status(401).json({ error: "Unauthorized: No token provided" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
+  
   try {
     console.log("🔑 Verifying token...");
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userData = await getUserDataFromRequest(req);
     console.log("✅ Token verified successfully");
 
     console.log("🔍 Fetching user data...");
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(userData.userId).select("-password");
 
     if (!user) {
       console.log("❌ User not found");
@@ -422,7 +411,7 @@ app.get("/profile", async (req, res) => {
     });
   } catch (error) {
     console.error("🚨 Error verifying token or fetching user data:", error);
-    res.status(401).json({ error: "Invalid or expired token" });
+    res.status(401).json({ error: error.message || "Authentication failed" });
   }
 });
 
