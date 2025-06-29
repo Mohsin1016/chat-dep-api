@@ -251,7 +251,7 @@ app.post("/register", upload.single("profileImage"), async (req, res) => {
         }
 
         const verificationLink = `${
-          process.env.FRONTEND_URL || "http://localhost:5173"
+          process.env.FRONTEND_URL || "https://chat-dep-front.vercel.app"
         }/verify-email?token=${token}`;
         console.log("📧 Sending verification email to:", email);
 
